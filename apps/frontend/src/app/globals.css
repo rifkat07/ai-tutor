@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Базовые стили темной темы и KaTeX */
+body {
+  background-color: #020617;
+  color: #f8fafc;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.katex-rendered-text .katex {
+  font-size: 1.1em;
+}

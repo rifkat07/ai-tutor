@@ -1,0 +1,18 @@
+# Временные папки Node.js (Vercel установит их сам)
+node_modules/
+.next/
+dist/
+out/
+build/
+
+# Временные файлы Python и локальная БД
+__pycache__/
+*.pyc
+*.db
+*.sqlite3
+ai_tutor.db
+
+# Конфиденциальные ключи и скачанные PDF
+.env
+.env.local
+database_pdf_materials/

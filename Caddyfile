@@ -1,0 +1,9 @@
+# Замените api.your-domain.ru на ваш реальный домен API или оставьте :80 для тестов по IP
+{$DOMAIN:api.ai-tutor.ru} {
+    reverse_proxy backend:8000 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: ai_tutor_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tutor_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-super_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_tutor_db}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    networks:
+      - ai_tutor_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tutor_admin} -d ${POSTGRES_DB:-ai_tutor_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai_tutor_redis_prod
+    restart: always
+    volumes:
+      - redisdata_prod:/data
+    networks:
+      - ai_tutor_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: ai_tutor_backend_prod
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-tutor_admin}:${POSTGRES_PASSWORD:-super_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-ai_tutor_db}
+      - REDIS_URL=redis://redis:6379/0
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai_tutor_net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ai_tutor_caddy_ssl
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+    networks:
+      - ai_tutor_net
+
+networks:
+  ai_tutor_net:
+    driver: bridge
+
+volumes:
+  pgdata_prod:
+  redisdata_prod:
+  caddy_data:
+  caddy_config:

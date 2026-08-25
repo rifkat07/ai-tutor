@@ -166,16 +166,17 @@ class RAGTask(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+
 class Textbook(Base):
     __tablename__ = "textbooks"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    subject: Mapped[str] = mapped_column(VARCHAR(32), nullable=False, index=True) # math, physics, cs, russian
-    grade: Mapped[int] = mapped_column(INTEGER, nullable=False, index=True)       # 5, 6, 7, 8, 9, 10, 11
-    author: Mapped[str] = mapped_column(VARCHAR(128), nullable=False)             # Виленкин, Атанасян, Мерзляк, Пёрышкин
-    title: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)              # Математика 5 класс. Часть 1
+    subject: Mapped[str] = mapped_column(VARCHAR(32), nullable=False, index=True)
+    grade: Mapped[int] = mapped_column(INTEGER, nullable=False, index=True)
+    author: Mapped[str] = mapped_column(VARCHAR(128), nullable=False)
+    title: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)
     part: Mapped[Optional[int]] = mapped_column(INTEGER, default=1)
     publication_year: Mapped[int] = mapped_column(INTEGER, default=2023)
 
@@ -193,9 +194,26 @@ class TextbookExercise(Base):
     textbook_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("textbooks.id", ondelete="CASCADE"), index=True
     )
-    exercise_number: Mapped[str] = mapped_column(VARCHAR(32), nullable=False, index=True) # №342, №15.4, №100
-    chapter_title: Mapped[Optional[str]] = mapped_column(VARCHAR(255), nullable=True)     # Дроби, Треугольники
-    condition_text: Mapped[str] = mapped_column(Text, nullable=False)                       # Условие упражнения
-    official_solution_hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # Подсказка / Ход решения
+    exercise_number: Mapped[str] = mapped_column(VARCHAR(32), nullable=False, index=True)
+    chapter_title: Mapped[Optional[str]] = mapped_column(VARCHAR(255), nullable=True)
+    condition_text: Mapped[str] = mapped_column(Text, nullable=False)
+    official_solution_hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     textbook: Mapped["Textbook"] = relationship(back_populates="exercises")
+
+
+# 📥 ТАБЛИЦА ГОТОВЫХ ОЦИФРОВАННЫХ ВАРИАНТОВ СДАМГИА / РЕШУЕГЭ
+class SdamgiaVariant(Base):
+    __tablename__ = "sdamgia_variants"
+
+    id: Mapped[str] = mapped_column(VARCHAR(64), primary_key=True) # например: "5421822", "3120803"
+    subject: Mapped[str] = mapped_column(VARCHAR(32), nullable=False, index=True) # math, physics, cs, russian
+    exam_type: Mapped[str] = mapped_column(VARCHAR(16), nullable=False, index=True) # EGE, OGE
+    variant_number: Mapped[str] = mapped_column(VARCHAR(32), nullable=False) # №1, №2, Вариант 5421822
+    title: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)
+    url: Mapped[str] = mapped_column(VARCHAR(500), nullable=False)
+    tasks_count: Mapped[int] = mapped_column(INTEGER, default=0)
+    tasks_data: Mapped[str] = mapped_column(Text, nullable=False) # JSON-строка со всеми реальными задачами
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

@@ -1,11 +1,11 @@
 import io
 import re
 from typing import Any, Dict, List
-import fitz  # PyMuPDF — профессиональный парсер PDF
+import fitz  # PyMuPDF
 
 
 class PDFIngestionService:
-    """Профессиональный сервис оцифровки PDF через PyMuPDF (fitz)."""
+    """Профессиональный сервис оцифровки PDF-учебников через PyMuPDF (fitz)."""
 
     @staticmethod
     def _clean_pdf_raw_text(text: str) -> str:
@@ -15,15 +15,13 @@ class PDFIngestionService:
         cleaned = re.sub(r"(\w+)-\s*\n\s*(\w+)", r"\1\2", text)
         cleaned = re.sub(r"(\w+)-\s+(\w+)", r"\1\2", cleaned)
         cleaned = re.sub(
-            r"Издательство\s+[А-Яа-яA-Za-z]+", "", cleaned, flags=re.IGNORECASE
+            r"Издательство\s+[А-Яа-яA-Za-z]+|МЦНМО|Просвещение|Дрофа|Вентана-Граф",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
         )
-        cleaned = re.sub(
-            r"МЦНМО|Просвещение", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(r"ГЛАВА\s*\d+", "", cleaned, flags=re.IGNORECASE)
-        cleaned = re.sub(
-            r"Рис\.\s*\d+[\.\d]*", "", cleaned, flags=re.IGNORECASE
-        )
+        cleaned = re.sub(r"ГЛАВА\s*\d+|ПАРАГРАФ\s*\d+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"Рис\.\s*\d+[\.\d]*", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"[ \t]+", " ", cleaned)
         cleaned = re.sub(r"\n\s*\n+", "\n\n", cleaned)
         return cleaned.strip()
@@ -31,12 +29,11 @@ class PDFIngestionService:
     def parse_pdf_textbook(
         self, file_bytes: bytes, author: str, grade: int, subject: str
     ) -> List[Dict[str, Any]]:
-        """Оцифровка PDF с помощью PyMuPDF (fitz)."""
+        """Оцифровка сотен страниц PDF с сохранением всех номеров упражнений."""
         if not file_bytes.startswith(b"%PDF"):
             return []
 
         try:
-            # Чтение через PyMuPDF (fitz)
             doc = fitz.open(stream=file_bytes, filetype="pdf")
             pages_text = []
 
@@ -55,8 +52,8 @@ class PDFIngestionService:
 
             exercises = []
 
-            # Поиск разделителей номеров
-            pattern = r"(?:№|УПРАЖНЕНИЕ|Задание|Задача|Вариант|Тест|Т\d+\.\d+|\b\d+\.)\s*(\d+[a-zа-я\.-]*)"
+            # Поиск всех номеров заданий (№12, Упражнение 34, Задача 105, 124.)
+            pattern = r"(?:№|УПРАЖНЕНИЕ|Задание|Задача|Вариант|Тест|Т\d+\.\d+|\b\d{1,4}\.)\s*(\d+[a-zа-я\.-]*)"
             matches = list(re.finditer(pattern, full_text, re.IGNORECASE))
 
             if len(matches) >= 2:
@@ -74,16 +71,17 @@ class PDFIngestionService:
                     if len(ex_text) < 20 or "site:" in ex_text.lower():
                         continue
 
-                    if len(ex_text) > 350:
+                    # Если в одном блоке объединилось несколько номеров
+                    if len(ex_text) > 400:
                         sub_parts = re.split(
-                            r"(?=\bТ\d+\.\d+|\bТ\d+\b|\bЗадание\s*\d+|\bВариант\s*\d+)",
+                            r"(?=\b№\s*\d+|\bЗадание\s*\d+|\bЗадача\s*\d+|\b\d{1,4}\.)",
                             ex_text,
                         )
                         for sub in sub_parts:
                             sub_clean = sub.strip()
                             if len(sub_clean) >= 20:
                                 sub_num_match = re.search(
-                                    r"(Т\d+\.\d+|Т\d+|№\s*\d+|\bЗадание\s*\d+|\bВариант\s*\d+|\b\d+\.)",
+                                    r"(№\s*\d+|\bЗадание\s*\d+|\bЗадача\s*\d+|\b\d{1,4}\.)",
                                     sub_clean,
                                 )
                                 sub_num = (
@@ -94,7 +92,7 @@ class PDFIngestionService:
                                 exercises.append(
                                     {
                                         "exercise_number": sub_num,
-                                        "condition_text": sub_clean[:600],
+                                        "condition_text": sub_clean[:750],
                                         "chapter_title": f"{grade} класс — {author}",
                                     }
                                 )
@@ -102,7 +100,7 @@ class PDFIngestionService:
                         exercises.append(
                             {
                                 "exercise_number": f"№{ex_num}",
-                                "condition_text": ex_text[:600],
+                                "condition_text": ex_text[:750],
                                 "chapter_title": f"{grade} класс — {author}",
                             }
                         )
@@ -116,8 +114,8 @@ class PDFIngestionService:
 
                     exercises.append(
                         {
-                            "exercise_number": f"№{p_idx}",
-                            "condition_text": p_cleaned[:600],
+                            "exercise_number": f"Стр. {p_idx}",
+                            "condition_text": p_cleaned[:750],
                             "chapter_title": f"Раздел {p_idx} — {author}",
                         }
                     )

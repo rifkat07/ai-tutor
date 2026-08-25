@@ -1,5 +1,5 @@
-import json
 import asyncio
+import json
 import re
 from typing import AsyncGenerator, Dict, List, Tuple
 import httpx
@@ -7,43 +7,65 @@ from app.core.config import settings
 
 
 class LLMService:
-    """Сервис ИИ, настроенный на молниеносный Cerebras API с авто-повторами 429/404 и 3 уровнями подсказок."""
-
-    def __init__(self):
-        self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=15.0),
-            limits=httpx.Limits(
-                max_keepalive_connections=20, max_connections=100
-            ),
-            follow_redirects=True,
-        )
+    """Сервис 100% живого ИИ-диалога на Cerebras LPU (Llama 3.3 70B / Llama 3.1 8B) без задержек и шаблонов."""
 
     def _get_active_credentials(self) -> Tuple[str, List[str], Dict[str, str]]:
-        # Ключ берется из переменных окружения (.env)
         raw_key = (
-            settings.GROQ_API_KEY
-            or settings.DEEPSEEK_API_KEY
+            getattr(settings, "CEREBRAS_API_KEY", None)
+            or getattr(settings, "GROQ_API_KEY", None)
+            or getattr(settings, "DEEPSEEK_API_KEY", None)
             or "csk-8xf9fk25menphrn6e4twexxt5px62v8kkmhkpmn4n3rytjp4"
         ).strip()
 
-        # Базовый URL Cerebras API
-        base_url = (
-            settings.GROQ_BASE_URL
-            or settings.DEEPSEEK_BASE_URL
+        base_url_setting = (
+            getattr(settings, "CEREBRAS_BASE_URL", None)
+            or getattr(settings, "GROQ_BASE_URL", None)
+            or getattr(settings, "DEEPSEEK_BASE_URL", None)
             or "https://api.cerebras.ai/v1"
         ).strip().rstrip("/")
 
-        # Каскадный список моделей Cerebras на случай 404/429
-        models_to_try = [
-            settings.GROQ_CHAT_MODEL,
-            "llama3.3-70b",
-            "llama-3.3-70b",
-            "llama3.1-70b",
-            "gemma-4-31b",
-        ]
+        user_configured_model = (
+            getattr(settings, "CEREBRAS_MODEL", None)
+            or getattr(settings, "GROQ_CHAT_MODEL", None)
+            or getattr(settings, "DEEPSEEK_CHAT_MODEL", None)
+        )
+
+        if raw_key.startswith("csk-"):
+            endpoint = "https://api.cerebras.ai/v1/chat/completions"
+            candidate_models = [
+                user_configured_model or "llama-3.3-70b",
+                "llama-3.3-70b",
+                "llama3.1-8b",
+                "llama-3.1-70b",
+            ]
+        elif raw_key.startswith("gsk_"):
+            endpoint = "https://api.groq.com/openai/v1/chat/completions"
+            candidate_models = [
+                user_configured_model or "llama-3.3-70b-versatile",
+                "llama-3.3-70b-versatile",
+                "gemma2-9b-it",
+            ]
+        elif raw_key.startswith("sk-or-"):
+            endpoint = "https://openrouter.ai/api/v1/chat/completions"
+            candidate_models = [
+                user_configured_model or "meta-llama/llama-3.3-70b-instruct",
+                "meta-llama/llama-3.3-70b-instruct",
+                "google/gemma-2-9b-it",
+            ]
+        else:
+            endpoint = (
+                f"{base_url_setting}/chat/completions"
+                if not base_url_setting.endswith("/chat/completions")
+                else base_url_setting
+            )
+            candidate_models = [
+                user_configured_model or "llama-3.3-70b",
+                "llama-3.3-70b",
+                "llama3.1-8b",
+            ]
 
         unique_models = []
-        for m in models_to_try:
+        for m in candidate_models:
             if m and m not in unique_models:
                 unique_models.append(m)
 
@@ -51,20 +73,12 @@ class LLMService:
             "Authorization": f"Bearer {raw_key}",
             "Content-Type": "application/json",
         }
-
-        endpoint = (
-            f"{base_url}/chat/completions"
-            if not base_url.endswith("/chat/completions")
-            else base_url
-        )
         return (endpoint, unique_models, headers)
 
     @staticmethod
     def _clean_text_output(text: str) -> str:
-        """Полная стирка служебных плашек безопасности и <think> мыслей."""
         if not text:
             return ""
-        # 1. Удаляем служебную плашку безопасности OpenRouter / Gemini
         cleaned = re.sub(
             r"User Safety:\s*\w+\s*Response Safety:\s*\w+",
             "",
@@ -77,23 +91,19 @@ class LLMService:
         cleaned = re.sub(
             r"User Safety:\s*\w+", "", cleaned, flags=re.IGNORECASE
         )
-        # 2. Удаляем мысли <think>...</think>
         cleaned = re.sub(
             r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE
         )
         cleaned = re.sub(
             r"^[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE
         )
-        cleaned = re.sub(
-            r"<think>[\s\S]*$", "", cleaned, flags=re.IGNORECASE
-        )
+        cleaned = re.sub(r"<think>[\s\S]*$", "", cleaned, flags=re.IGNORECASE)
         return cleaned.strip()
 
     async def generate_response(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.3,
-        use_reasoner: bool = False,
+        temperature: float = 0.2,
         max_tokens: int = 2048,
     ) -> str:
         endpoint, models, headers = self._get_active_credentials()
@@ -106,27 +116,38 @@ class LLMService:
                 "stream": False,
             }
             try:
-                res = await self.client.post(
-                    endpoint, headers=headers, json=payload
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(45.0, connect=10.0),
+                    follow_redirects=True,
+                ) as client:
+                    res = await client.post(
+                        endpoint, headers=headers, json=payload
+                    )
+                    if res.status_code == 200:
+                        data = res.json()
+                        raw_text = data["choices"][0]["message"]["content"]
+                        return self._clean_text_output(raw_text)
+                    else:
+                        print(
+                            f"⚠️ LLM POST Error [{res.status_code}] for {model}: {res.text}"
+                        )
+            except Exception as e:
+                print(
+                    f"⚠️ LLM Connection Exception for {model}: {type(e).__name__}: {e}"
                 )
-                if res.status_code == 200:
-                    data = res.json()
-                    raw_text = data["choices"][0]["message"]["content"]
-                    return self._clean_text_output(raw_text)
-            except Exception:
                 continue
-        return "Не удалось получить ответ от моделей Cerebras."
+
+        return ""
 
     async def generate_stream(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.3,
-        use_reasoner: bool = False,
-        max_tokens: int = 2048,
+        max_tokens: int = 450,
         hint_type: str = None,
     ) -> AsyncGenerator[str, None]:
-        """Потоковая молниеносная генерация ответа от Cerebras LPU."""
         endpoint, models, headers = self._get_active_credentials()
+        has_streamed_tokens = False
 
         for model in models:
             payload = {
@@ -138,133 +159,67 @@ class LLMService:
             }
 
             try:
-                async with self.client.stream(
-                    "POST", endpoint, headers=headers, json=payload
-                ) as response:
-                    # Если очередь переполнена (429/503) или модель не найдена (404) — пробуем следующую модель
-                    if response.status_code in (429, 503, 404):
-                        print(
-                            f"⚠️ Cerebras ({model}) вернул {response.status_code}. Пробуем следующую модель..."
-                        )
-                        await asyncio.sleep(0.3)
-                        continue
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(45.0, connect=10.0),
+                    follow_redirects=True,
+                ) as client:
+                    async with client.stream(
+                        "POST", endpoint, headers=headers, json=payload
+                    ) as response:
+                        if response.status_code != 200:
+                            err_body = await response.aread()
+                            print(
+                                f"⚠️ Stream Error [{response.status_code}] for {model}: {err_body.decode('utf-8', errors='ignore')}"
+                            )
+                            continue
 
-                    if response.status_code != 200:
-                        err_body = await response.aread()
-                        err_text = err_body.decode("utf-8", errors="ignore")
-                        yield f"⚠️ **Ошибка Cerebras API ({response.status_code})**: `{err_text}`"
-                        return
+                        in_think_block = False
+                        async for line in response.aiter_lines():
+                            if line.startswith("data: "):
+                                data_str = line[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
+                                try:
+                                    chunk = json.loads(data_str)
+                                    delta = chunk["choices"][0]["delta"]
+                                    text_chunk = delta.get("content")
 
-                    in_think_block = False
-                    async for line in response.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:].strip()
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                chunk = json.loads(data_str)
-                                delta = chunk["choices"][0]["delta"]
+                                    if text_chunk:
+                                        if (
+                                            "User Safety:" in text_chunk
+                                            or "Response Safety:" in text_chunk
+                                        ):
+                                            continue
+                                        if "<think>" in text_chunk:
+                                            in_think_block = True
+                                            continue
+                                        if "</think>" in text_chunk:
+                                            in_think_block = False
+                                            text_chunk = text_chunk.split(
+                                                "</think>"
+                                            )[-1]
 
-                                text_chunk = delta.get("content")
-                                if text_chunk:
-                                    if (
-                                        "User Safety:" in text_chunk
-                                        or "Response Safety:" in text_chunk
-                                    ):
-                                        continue
-                                    if "<think>" in text_chunk:
-                                        in_think_block = True
-                                        continue
-                                    if "</think>" in text_chunk:
-                                        in_think_block = False
-                                        text_chunk = text_chunk.split(
-                                            "</think>"
-                                        )[-1]
+                                        if not in_think_block and text_chunk:
+                                            has_streamed_tokens = True
+                                            yield text_chunk
 
-                                    if not in_think_block and text_chunk:
-                                        yield text_chunk
-                            except (json.JSONDecodeError, KeyError, IndexError):
-                                continue
-                    return # Успешно запустили и отстримили!
+                                except (
+                                    json.JSONDecodeError,
+                                    KeyError,
+                                    IndexError,
+                                ):
+                                    continue
+
+                        if has_streamed_tokens:
+                            return
 
             except Exception as e:
-                print(f"❌ Ошибка соединения с моделью {model}: {e}")
-                await asyncio.sleep(0.3)
+                print(
+                    f"⚠️ Stream error for {model}: {type(e).__name__}: {e}"
+                )
+                if has_streamed_tokens:
+                    return
                 continue
-
-        # В случае полного отключения сети — Сократовский отвечик
-        sys_content = (
-            messages[0]["content"]
-            if messages and messages[0]["role"] == "system"
-            else ""
-        )
-        last_user_input = messages[-1]["content"] if messages else ""
-        history_text = " ".join([m.get("content", "") for m in messages[-4:]])
-
-        socratic_reply = self._generate_smart_socratic_reply(
-            last_user_input, sys_content, history_text, hint_type
-        )
-        clean_reply = self._clean_text_output(socratic_reply)
-        words = clean_reply.split(" ")
-        for i, word in enumerate(words):
-            yield word + (" " if i < len(words) - 1 else "")
-            await asyncio.sleep(0.01)
-
-    def _generate_smart_socratic_reply(
-        self,
-        user_input: str,
-        sys_content: str = "",
-        history_text: str = "",
-        hint_type: str = None,
-    ) -> str:
-        """Интеллектуальный Сократовский отвечик."""
-        inp = user_input.lower().strip()
-        sys_lower = sys_content.lower()
-        hist_lower = history_text.lower()
-
-        # -----------------------------------------------------------------
-        # 1. ОБРАБОТКА 3 УРОВНЕЙ ПОДСКАЗОК (🟢 Легкая, 🟡 Средняя, 🔴 Сильная)
-        # -----------------------------------------------------------------
-        if "подсказк" in inp or "помоги" in inp or hint_type:
-            # 🔴 СИЛЬНАЯ ПОДСКАЗКА
-            if hint_type == "strong" or "сильн" in inp:
-                if (
-                    "2\\cos(x)" in hist_lower
-                    or "2cos(x)" in hist_lower
-                    or "произведение" in hist_lower
-                ):
-                    return (
-                        "🔴 **Сильная подсказка (Разбор шага):**\n"
-                        "Уравнение $\\cos(x)(2\\cos(x) - \\sqrt{3}) = 0$ состоит из двух множителей.\n"
-                        "Приравниваем каждый к нулю:\n"
-                        "1) $\\cos(x) = 0 \\implies x = \\frac{\\pi}{2} + \\pi k, k \\in \\mathbb{Z}$\n"
-                        "2) $2\\cos(x) - \\sqrt{3} = 0 \\implies \\cos(x) = \\frac{\\sqrt{3}}{2} \\implies x = \\pm \\frac{\\pi}{6} + 2\\pi n, n \\in \\mathbb{Z}$\n\n"
-                        "Какую формулу применим для отбора корней в пункте «б»?"
-                    )
-                else:
-                    return (
-                        "🔴 **Сильная подсказка (Разбор первого шага):**\n"
-                        "Уравнение $2\\sin^2(x) + \\sqrt{3}\\sin(x) = 0$ содержит общий множитель $\\sin(x)$.\n"
-                        "Вынесем $\\sin(x)$ за скобки:\n"
-                        "$$\\sin(x)(2\\sin(x) + \\sqrt{3}) = 0$$\n"
-                        "Теперь приравняй каждый множитель к нулю!"
-                    )
-
-            # 🟡 СРЕДНЯЯ ПОДСКАЗКА
-            elif hint_type == "medium" or "средн" in inp:
-                return (
-                    "🟡 **Средняя подсказка (План шага):**\n"
-                    "Вынеси общий множитель за скобки, чтобы получить произведение $A \\cdot B = 0$, и прировняй каждую часть к нулю."
-                )
-
-            # 🟢 ЛЕГКАЯ ПОДСКАЗКА
-            else:
-                return (
-                    "🟢 **Легкая подсказка (Намёк):**\n"
-                    "Посмотри на структуру слагаемых: у них есть общий элемент. Вспомни правило вынесения общего множителя за скобки!"
-                )
-
-        return f"Интересный шаг! Ты написал: «{user_input}». Давай разберем его дальше."
 
 
 deepseek_service = LLMService()

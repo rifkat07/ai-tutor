@@ -1,9 +1,21 @@
 import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from app.domain.pedagogy.socratic import socratic_manager
 from app.services.vision import vision_service
 
 router = APIRouter()
+
+
+async def safe_send_json(websocket: WebSocket, payload: dict) -> bool:
+    """Безопасная отправка JSON без исключений при обрыве соединения."""
+    if websocket.client_state == WebSocketState.CONNECTED:
+        try:
+            await websocket.send_json(payload)
+            return True
+        except (WebSocketDisconnect, RuntimeError):
+            return False
+    return False
 
 
 @router.websocket("/ws/{session_id}")
@@ -11,34 +23,47 @@ async def socratic_chat_ws(websocket: WebSocket, session_id: str):
     await websocket.accept()
     try:
         while True:
-            raw_data = await websocket.receive_text()
+            try:
+                raw_data = await websocket.receive_text()
+            except (WebSocketDisconnect, RuntimeError):
+                break
+
             try:
                 payload = json.loads(raw_data)
             except json.JSONDecodeError:
-                await websocket.send_json(
-                    {"type": "error", "content": "Invalid JSON format"}
+                await safe_send_json(
+                    websocket, {"type": "error", "content": "Invalid JSON format"}
                 )
                 continue
 
-            student_text = payload.get("message", "")
+            # ИЗВЛЕКАЕМ ДАННЫЕ БЕЗ ЗАХАРДКОЖЕННЫХ ДЕФОЛТОВ С ТРИГОНОМЕТРИЕЙ
+            student_text = payload.get("message") or ""
             hint_type = payload.get("hint_type", None)
-            subject = payload.get("subject", "Математика")
-            exam_type = payload.get("exam_type", "ЕГЭ")  # Считываем exam_type
-            competency_title = payload.get("competency", "Тригонометрия")
-            task_context = payload.get("task_context", "sin(x) = 0.5")
-            p_mastery = payload.get("p_mastery", 0.3)
-            chat_history = payload.get("history", [])
+            subject = payload.get("subject") or "Математика"
+            exam_type = payload.get("exam_type") or "ЕГЭ"
+            competency_title = payload.get("competency") or "Решение задачи"
+            task_context = payload.get("task_context") or student_text or "Условие задачи"
+            p_mastery = float(payload.get("p_mastery") or 0.3)
+            chat_history = payload.get("history") or []
             base64_image = payload.get("image", None)
+
+            is_client_connected = True
 
             try:
                 if base64_image:
-                    await websocket.send_json(
-                        {"type": "token", "content": "🔍 *Сканирую решение с фото тетради...*\n\n"}
+                    await safe_send_json(
+                        websocket,
+                        {
+                            "type": "token",
+                            "content": "🔍 *Сканирую решение с фото тетради...*\n\n",
+                        },
                     )
                     ocr_analysis = await vision_service.analyze_notebook_photo(
                         base64_image, task_context
                     )
-                    await websocket.send_json({"type": "token", "content": ocr_analysis})
+                    await safe_send_json(
+                        websocket, {"type": "token", "content": ocr_analysis}
+                    )
                 else:
                     async for chunk in socratic_manager.generate_response_stream(
                         subject=subject,
@@ -47,21 +72,40 @@ async def socratic_chat_ws(websocket: WebSocket, session_id: str):
                         student_input=student_text,
                         p_mastery=p_mastery,
                         hint_type=hint_type,
-                        exam_type=exam_type,  # Передаем exam_type
+                        exam_type=exam_type,
                         chat_history=chat_history,
                     ):
-                        await websocket.send_json({"type": "token", "content": chunk})
+                        sent = await safe_send_json(
+                            websocket, {"type": "token", "content": chunk}
+                        )
+                        if not sent:
+                            is_client_connected = False
+                            break
+            except (WebSocketDisconnect, RuntimeError):
+                is_client_connected = False
+                break
             except Exception as e:
-                print(f"❌ Chat WS Error: {str(e)}")
-                await websocket.send_json({
-                    "type": "token",
-                    "content": f"\n\n⚠️ **Ошибка связи**: `{str(e)}`."
-                })
+                print(f"❌ Chat WS Logic Error: {str(e)}")
+                if is_client_connected:
+                    await safe_send_json(
+                        websocket,
+                        {
+                            "type": "token",
+                            "content": f"\n\n⚠️ **Ошибка связи**: `{str(e)}`.",
+                        },
+                    )
             finally:
-                await websocket.send_json({"type": "end"})
+                if is_client_connected:
+                    await safe_send_json(websocket, {"type": "end"})
 
     except WebSocketDisconnect:
-        print(f"WebSocket session disconnected: {session_id}")
+        pass
     except Exception as e:
-        print(f"WebSocket Error: {str(e)}")
-        await websocket.close()
+        print(f"WebSocket Unexpected Error: {str(e)}")
+        if websocket.client_state == WebSocketState.CONNECTED:
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+    finally:
+        print(f"ℹ️ WebSocket session closed cleanly: {session_id}")

@@ -13,19 +13,33 @@ import {
   User as UserIcon,
   LogOut,
   GraduationCap,
-  BookOpen,
+  Zap,
+  Calendar,
 } from 'lucide-react';
-import { useChatStore, SUBJECTS, SubjectType, ExamType } from '@/store/useChatStore';
+import { useChatStore, SUBJECTS, SubjectType } from '@/store/useChatStore';
 import { useAuthStore } from '@/store/useAuthStore';
+import { DiagnosticTestModal } from '@/components/diagnostic/DiagnosticTestModal';
+import { ExamCountdownModal, getDynamicExamCountdown } from '@/components/countdown/ExamCountdownModal';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isDiagOpen, setIsDiagOpen] = useState(false);
+  const [isCountdownOpen, setIsCountdownOpen] = useState(false);
 
-  const { activeSubject, setSubject, examType, setExamType } = useChatStore();
+  const { activeSubject, setSubject, examType, setExamType, selectedGrade, pMastery } = useChatStore();
   const { user, isAuthenticated, logout } = useAuthStore();
 
-  const currentSubject = SUBJECTS[activeSubject];
+  const currentSubject = SUBJECTS[activeSubject] || SUBJECTS.math;
+
+  // 100% ДИНАМИЧЕСКИЙ РАСЧЕТ ИНДИКАТОРА ДЕДЛАЙНА
+  const countdownInfo = getDynamicExamCountdown(examType, selectedGrade || 5, pMastery);
+  
+  const getBadgeShortText = () => {
+    if (examType === 'EGE') return `⏳ До ЕГЭ: ${countdownInfo.daysLeft} дн • ${countdownInfo.recommendedPace}`;
+    if (examType === 'OGE') return `⏳ До ОГЭ: ${countdownInfo.daysLeft} дн • ${countdownInfo.recommendedPace}`;
+    return `⏳ До ВПР: ${countdownInfo.daysLeft} дн • ${selectedGrade} кл`;
+  };
 
   const navLinks = [
     { href: '/', label: 'Главная', icon: Home },
@@ -35,130 +49,156 @@ export const Navbar: React.FC = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3">
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-        {/* Логотип */}
-        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400 group-hover:scale-105 transition">
-            <Sparkles size={20} />
+    <>
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm px-4 lg:px-8 py-2.5">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          
+          {/* Логотип */}
+          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 group-hover:scale-105 transition shadow-sm">
+              <Sparkles size={20} />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-base tracking-tight text-slate-900 flex items-center gap-1.5">
+                AI-Tutor <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">v2.0</span>
+              </span>
+            </div>
+          </Link>
+
+          {/* 3 ГЛОБАЛЬНЫХ РАЗДЕЛА */}
+          <div className="flex bg-slate-100 border border-slate-200/90 p-1 rounded-xl text-xs shrink-0 gap-1 shadow-inner">
+            <button
+              onClick={() => setExamType('SCHOOL')}
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition ${
+                examType === 'SCHOOL'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <GraduationCap size={14} /> Школа (5–11 кл)
+            </button>
+            <button
+              onClick={() => setExamType('OGE')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                examType === 'OGE'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              ОГЭ (9 кл)
+            </button>
+            <button
+              onClick={() => setExamType('EGE')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                examType === 'EGE'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              ЕГЭ (11 кл)
+            </button>
           </div>
-          <div className="flex flex-col">
-            <span className="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
-              AI-Tutor <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">v2.0</span>
-            </span>
+
+          {/* ДИНАМИЧЕСКИЙ БЕЙДЖ ОБРАТНОГО ОТСЧЕТА */}
+          <button
+            onClick={() => setIsCountdownOpen(true)}
+            className="flex items-center gap-1.5 text-xs bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-800 px-3 py-1.5 rounded-xl font-bold transition shadow-sm active:scale-95 shrink-0"
+            title="Нажмите для просмотра индивидуального графика подготовки"
+          >
+            <Calendar size={13} className="text-amber-600" />
+            <span>{getBadgeShortText()}</span>
+          </button>
+
+          {/* КНОПКА ЗАПУСКА ДИАГНОСТИКИ */}
+          <button
+            onClick={() => setIsDiagOpen(true)}
+            className="flex items-center gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-1.5 rounded-xl transition font-bold shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
+          >
+            <Zap size={14} className="fill-white" /> Диагностика IRT
+          </button>
+
+          {/* Выбор Предмета */}
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-800 shadow-sm transition"
+            >
+              <span>{currentSubject.icon}</span>
+              <span className="hidden md:inline">{currentSubject.name}</span>
+              <ChevronDown size={14} className={`text-slate-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-2xl py-1.5 z-50 animate-in fade-in duration-150">
+                {Object.values(SUBJECTS).map((subj) => (
+                  <button
+                    key={subj.id}
+                    onClick={() => {
+                      setSubject(subj.id as SubjectType);
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition ${
+                      activeSubject === subj.id
+                        ? 'bg-blue-50 text-blue-600 font-bold'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-base">{subj.icon}</span>
+                    <span>{subj.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </Link>
 
-        {/* 3 ГЛОБАЛЬНЫХ РАЗДЕЛА: Школьный репетитор | ОГЭ | ЕГЭ */}
-        <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl text-xs shrink-0 gap-1">
-          <button
-            onClick={() => setExamType('SCHOOL')}
-            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition ${
-              examType === 'SCHOOL'
-                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <GraduationCap size={14} /> Школьный репетитор (5–11 кл)
-          </button>
-          <button
-            onClick={() => setExamType('OGE')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-              examType === 'OGE'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            ОГЭ (9 кл)
-          </button>
-          <button
-            onClick={() => setExamType('EGE')}
-            className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-              examType === 'EGE'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            ЕГЭ (11 кл)
-          </button>
-        </div>
-
-        {/* Выбор Предмета */}
-        <div className="relative">
-          <button
-            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-slate-700 px-3.5 py-2 rounded-xl text-xs font-medium text-slate-200 transition"
-          >
-            <span>{currentSubject.icon}</span>
-            <span className="hidden md:inline">{currentSubject.name}</span>
-            <ChevronDown size={14} className={`text-slate-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {isDropdownOpen && (
-            <div className="absolute left-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl py-2 z-50">
-              {Object.values(SUBJECTS).map((subj) => (
-                <button
-                  key={subj.id}
-                  onClick={() => {
-                    setSubject(subj.id as SubjectType);
-                    setIsDropdownOpen(false);
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-left transition ${
-                    activeSubject === subj.id
-                      ? 'bg-blue-600/20 text-blue-400 font-semibold'
-                      : 'text-slate-300 hover:bg-slate-800'
+          {/* Навигация */}
+          <nav className="flex items-center gap-1 sm:gap-1.5">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    isActive
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <span className="text-base">{subj.icon}</span>
-                  <span>{subj.name}</span>
+                  <Icon size={15} />
+                  <span className="hidden lg:inline">{link.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Профиль / Вход */}
+          <div className="shrink-0">
+            {isAuthenticated && user ? (
+              <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs shadow-sm">
+                <UserIcon size={14} className="text-blue-600" />
+                <span className="font-bold text-slate-800 hidden sm:inline">{user.full_name}</span>
+                <button onClick={logout} title="Выйти" className="text-slate-400 hover:text-red-600 ml-1 transition">
+                  <LogOut size={14} />
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Навигационные ссылки */}
-        <nav className="flex items-center gap-1 sm:gap-2">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href;
-            return (
+              </div>
+            ) : (
               <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-                }`}
+                href="/login"
+                className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-md shadow-blue-600/20"
               >
-                <Icon size={16} />
-                <span className="hidden lg:inline">{link.label}</span>
+                Войти
               </Link>
-            );
-          })}
-        </nav>
+            )}
+          </div>
 
-        {/* Профиль */}
-        <div className="shrink-0">
-          {isAuthenticated && user ? (
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-              <UserIcon size={14} className="text-blue-400" />
-              <span className="font-medium text-slate-200 hidden sm:inline">{user.full_name}</span>
-              <button onClick={logout} title="Выйти" className="text-slate-400 hover:text-red-400 ml-1 transition">
-                <LogOut size={14} />
-              </button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium px-4 py-2 rounded-xl transition shadow-md shadow-blue-600/20"
-            >
-              Войти
-            </Link>
-          )}
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Модальные окна */}
+      <DiagnosticTestModal isOpen={isDiagOpen} onClose={() => setIsDiagOpen(false)} />
+      <ExamCountdownModal isOpen={isCountdownOpen} onClose={() => setIsCountdownOpen(false)} />
+    </>
   );
 };

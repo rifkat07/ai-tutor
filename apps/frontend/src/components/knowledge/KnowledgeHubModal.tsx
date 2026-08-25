@@ -623,8 +623,8 @@ export const KnowledgeHubModal: React.FC<KnowledgeHubModalProps> = ({
                             className="bg-white p-1 rounded border border-slate-200 shadow-2xs"
                           >
                             <span className="text-indigo-600 block text-[8px] font-bold">
-                              {item.p}
-                            </span>
+  			      {(item as any).p || (item as any).n}
+			    </span>
                             <strong className="text-slate-900">{item.v}</strong>
                           </div>
                         ))}

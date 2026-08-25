@@ -120,16 +120,13 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
           ))}
         </div>
 
-        {/* 4. Прокручиваемый контент справочника */}
+        {/* 4. Контент справочника */}
         <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-1">
           
-          {/* ========================================================================= */}
-          {/* 1. МАТЕМАТИКА И АЛГЕБРА                                                  */}
-          {/* ========================================================================= */}
+          {/* 1. МАТЕМАТИКА И АЛГЕБРА */}
           {(currentTab === 'math' || currentTab === 'algebra') && (
             <div className="space-y-4">
               
-              {/* Арифметика 5–6 классы */}
               {matchesGrade([5, 6]) && matchesSearch('арифметика порядок действий дроби пропорции проценты нок нод модуль') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-3">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-between">
@@ -151,7 +148,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Таблица квадратов и степеней */}
               {matchesGrade([7, 8, 9, 10, 11]) && matchesSearch('таблица квадратов кубов степени двойки') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center justify-between">
@@ -176,7 +172,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* ФСУ, Степени и Корни */}
               {matchesGrade([7, 8, 9, 10, 11]) && matchesSearch('фсу степени корни формулы сокращенного умножения кубы') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -198,7 +193,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Квадратные уравнения, Виет и Прогрессии */}
               {matchesGrade([8, 9, 10, 11]) && matchesSearch('квадратные уравнения дискриминант виет прогрессия') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -219,7 +213,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Логарифмы и Метод рационализации */}
               {matchesGrade([10, 11]) && matchesSearch('логарифм ln log рационализация свойства') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -240,7 +233,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Тригонометрический круг и формулы */}
               {matchesGrade([9, 10, 11]) && matchesSearch('тригонометрия sin cos tg ctg пи круг формулы приведения') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -311,7 +303,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Производные и Первообразные */}
               {matchesGrade([10, 11]) && matchesSearch('производная первообразная касательная интеграл экстремум') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -335,13 +326,10 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* 2. ГЕОМЕТРИЯ И СТЕРЕОМЕТРИЯ                                              */}
-          {/* ========================================================================= */}
+          {/* 2. ГЕОМЕТРИЯ И СТЕРЕОМЕТРИЯ */}
           {currentTab === 'geometry' && (
             <div className="space-y-4">
               
-              {/* Планиметрия 7-9 классы */}
               {matchesGrade([7, 8, 9, 10, 11]) && matchesSearch('планиметрия треугольник трапеция ромб параллелограмм круг пифагор') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -365,7 +353,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Стереометрия 10-11 классы */}
               {matchesGrade([10, 11]) && matchesSearch('стереометрия объем цилиндр конус шар сфера пирамида призма') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -388,7 +375,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Векторы */}
               {matchesGrade([9, 10, 11]) && matchesSearch('векторы координаты скалярное произведение длина') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -410,13 +396,10 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* 3. ФИЗИКА (5 РАЗДЕЛОВ + КОНСТАНТЫ)                                        */}
-          {/* ========================================================================= */}
+          {/* 3. ФИЗИКА */}
           {currentTab === 'physics' && (
             <div className="space-y-4">
               
-              {/* Константы */}
               {matchesSearch('константы ускорение скорость света постоянная авогадро плотность') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -443,7 +426,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Механика и Динамика */}
               {matchesSearch('механика ньютон импульс кинематика энергия архимед гидростатика') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -464,7 +446,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* МКТ и Термодинамика */}
               {matchesSearch('мкт газ теплота кпд менделеев термодинамика карно') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -483,7 +464,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Электродинамика */}
               {matchesSearch('ток кулон ом мощность конденсатор индуктивность ампер лоренц') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -504,7 +484,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Оптика и Квантовая физика */}
               {matchesSearch('оптика снеллиус линза фотоэффект эйнштейн де бройль') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -524,13 +503,10 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* 4. ХИМИЯ                                                                 */}
-          {/* ========================================================================= */}
+          {/* 4. ХИМИЯ */}
           {currentTab === 'chemistry' && (
             <div className="space-y-4">
               
-              {/* Ряд металлов */}
               {matchesSearch('металлы ряд напряжений активность') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -540,12 +516,11 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                     Li → K → Ba → Ca → Na → Mg → Al → Zn → Cr → Fe → Ni → Sn → Pb → (H₂) → Cu → Hg → Ag → Pt → Au
                   </div>
                   <p className="text-[10px] text-slate-500 italic">
-                    Металлы до водорода (H₂) вытесняют H₂ из растворов кислот-неокислителей. Более активный металл вытесняет менее активный из растворов солей.
+                    Металлы до водорода (H₂) вытесняют H₂ из растворов кислот-неокислителей.
                   </p>
                 </div>
               )}
 
-              {/* Расчетные формулы */}
               {matchesSearch('молярная масса объем концентрация доля плотность') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -564,7 +539,7 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Органические классы */}
+              {/* ОРГАНИЧЕСКИЕ КЛАССЫ С ЭКРАНИРОВАНИЕМ СТРОК ДЛЯ JSX */}
               {matchesSearch('органика алканы алкены алкины спирты кислоты углеводороды') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -573,19 +548,19 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono text-center">
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
                       <span className="text-indigo-600 block text-[10px] font-bold">Алканы:</span>
-                      <strong className="text-slate-900">C_n H_{2n+2}</strong>
+                      <strong className="text-slate-900">{'C_n H_{2n+2}'}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
                       <span className="text-indigo-600 block text-[10px] font-bold">Алкены:</span>
-                      <strong className="text-slate-900">C_n H_{2n}</strong>
+                      <strong className="text-slate-900">{'C_n H_{2n}'}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
                       <span className="text-indigo-600 block text-[10px] font-bold">Алкины / Диены:</span>
-                      <strong className="text-slate-900">C_n H_{2n-2}</strong>
+                      <strong className="text-slate-900">{'C_n H_{2n-2}'}</strong>
                     </div>
                     <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
                       <span className="text-indigo-600 block text-[10px] font-bold">Спирты:</span>
-                      <strong className="text-slate-900">C_n H_{2n+1}OH</strong>
+                      <strong className="text-slate-900">{'C_n H_{2n+1}OH'}</strong>
                     </div>
                   </div>
                 </div>
@@ -594,13 +569,10 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* 5. ИНФОРМАТИКА                                                           */}
-          {/* ========================================================================= */}
+          {/* 5. ИНФОРМАТИКА */}
           {currentTab === 'cs' && (
             <div className="space-y-4">
               
-              {/* Степени двойки */}
               {matchesSearch('степени двойки байты кбайты') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -619,13 +591,13 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                       </div>
                     ))}
                   </div>
-                  <p className="text-[10px] text-slate-500 pt-1">
-                    $1\text{ Байт} = 8\text{ бит}, \quad 1\text{ Кбайт} = 1024\text{ Байт}, \quad 1\text{ Мбайт} = 1024\text{ Кбайт}, \quad 1\text{ Гбайт} = 1024\text{ Мбайт}$.
-                  </p>
+                  {/* ИСПРАВЛЕННАЯ СТРОКА С БАЙТАМИ */}
+                  <div className="text-[10px] text-slate-500 pt-1 font-mono">
+                    {'1 Байт = 8 бит, 1 Кбайт = 1024 Байт, 1 Мбайт = 1024 Кбайт, 1 Гбайт = 1024 Мбайт'}
+                  </div>
                 </div>
               )}
 
-              {/* Кодирование и комбинаторика */}
               {matchesSearch('кодирование звук графика комбинаторика алфавит передача') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -647,7 +619,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Шпаргалка Python для КЕГЭ */}
               {matchesSearch('python методы функции списки itertools') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -674,13 +645,10 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* 6. РУССКИЙ ЯЗЫК                                                          */}
-          {/* ========================================================================= */}
+          {/* 6. РУССКИЙ ЯЗЫК */}
           {currentTab === 'russian' && (
             <div className="space-y-4">
               
-              {/* Н и НН */}
               {matchesSearch('н и нн причастия прилагательные суффиксы') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -705,7 +673,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* Корни с чередованием */}
               {matchesSearch('чередование корни гар гор лаг лож раст ращ рос бер бир') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
@@ -733,7 +700,6 @@ export const ReferenceMaterialsModal: React.FC<ReferenceMaterialsModalProps> = (
                 </div>
               )}
 
-              {/* НЕ слитно и раздельно */}
               {matchesSearch('не слитно раздельно причастия глаголы') && (
                 <div className="bg-slate-50/70 border border-slate-200 p-4 rounded-2xl space-y-2">
                   <h3 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">

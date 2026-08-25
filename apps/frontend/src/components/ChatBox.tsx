@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from '@/store/useChatStore';
-import { ChatMessageComponent } from './ChatMessage';
+import { ChatMessageComponent } from '@/components/chat/ChatMessage';
 import { TutorMascot } from '@/components/mascot/TutorMascot';
 import { MascotWardrobeModal } from '@/components/gamification/MascotWardrobeModal';
 import { useVoiceCoPilot } from '@/hooks/useVoiceCoPilot';

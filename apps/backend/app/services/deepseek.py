@@ -7,7 +7,21 @@ from app.core.config import settings
 
 
 class LLMService:
-    """Сервис 100% живого ИИ-диалога на Cerebras LPU (Llama 3.3 70B / Llama 3.1 8B) без задержек и шаблонов."""
+    """Сервис живого ИИ-диалога на Cerebras LPU с обходом блокировок Cloudflare WAF 403."""
+
+    BROWSER_HEADERS = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/event-stream, */*",
+        "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Origin": "https://cerebras.ai",
+        "Referer": "https://cerebras.ai/",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "cross-site",
+    }
 
     def _get_active_credentials(self) -> Tuple[str, List[str], Dict[str, str]]:
         raw_key = (
@@ -70,6 +84,7 @@ class LLMService:
                 unique_models.append(m)
 
         headers = {
+            **self.BROWSER_HEADERS,
             "Authorization": f"Bearer {raw_key}",
             "Content-Type": "application/json",
         }
@@ -129,7 +144,7 @@ class LLMService:
                         return self._clean_text_output(raw_text)
                     else:
                         print(
-                            f"⚠️ LLM POST Error [{res.status_code}] for {model}: {res.text}"
+                            f"⚠️ LLM POST Error [{res.status_code}] for {model}: {res.text[:200]}"
                         )
             except Exception as e:
                 print(
@@ -169,7 +184,7 @@ class LLMService:
                         if response.status_code != 200:
                             err_body = await response.aread()
                             print(
-                                f"⚠️ Stream Error [{response.status_code}] for {model}: {err_body.decode('utf-8', errors='ignore')}"
+                                f"⚠️ Stream Error [{response.status_code}] for {model}: {err_body.decode('utf-8', errors='ignore')[:200]}"
                             )
                             continue
 

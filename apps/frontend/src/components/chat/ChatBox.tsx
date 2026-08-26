@@ -6,7 +6,7 @@ import { ChatMessageComponent } from './ChatMessage';
 import { TutorMascot } from '@/components/mascot/TutorMascot';
 import { MascotWardrobeModal } from '@/components/gamification/MascotWardrobeModal';
 import { useVoiceCoPilot } from '@/hooks/useVoiceCoPilot';
-import { ChatWebSocketClient } from '@/lib/websocket';
+import { ChatWebSocketClient, ConnectionStatus } from '@/lib/websocket';
 import {
   Send,
   Loader2,
@@ -20,6 +20,8 @@ import {
   Volume2,
   VolumeX,
   UploadCloud,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 const genId = (prefix: string) => `${Date.now()}-${prefix}-${Math.random().toString(36).substring(2, 7)}`;
@@ -155,7 +157,6 @@ function getAdaptiveSymbols(grade: number, subject: string, examType: string) {
   };
 }
 
-// 🧠 ИЗВЛЕКАЕТ ТЕКСТ ТОЛЬКО ИЗ НАСТОЯЩИХ ОТВЕТОВ VISION OCR
 function extractOcrTaskText(fullAiResponse: string): string | null {
   if (!fullAiResponse) return null;
 
@@ -167,7 +168,6 @@ function extractOcrTaskText(fullAiResponse: string): string | null {
     return null;
   }
 
-  // Извлекаем только по явному маркеру OCR
   const match = fullAiResponse.match(
     /(?:Распознанный текст с фото|Распознанный текст|Условие с фото|Распознано|Условие задания|Текст задачи с фото)[:\*]*\s*([\s\S]+?)(?=(?:\n\s*🔍|\n\s*💡|\n\s*\*\*Анализ|\n\s*\*\*Сократовский|\*\*Анализ|\*\*Сократовский|\n\s*С чего начнем|\n\s*Давай решим|$))/i
   );
@@ -185,15 +185,14 @@ export const ChatBox: React.FC = () => {
   const [isMathKeyboardOpen, setIsMathKeyboardOpen] = useState(false);
   const [isWardrobeOpen, setIsWardrobeOpen] = useState(false);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
 
   const textInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const wsClientRef = useRef<ChatWebSocketClient | null>(null);
 
-  // Флаг: было ли прикреплено фото в текущем отправленном запросе
   const sentWithImageRef = useRef<boolean>(false);
-
   const lastActivityRef = useRef<number>(Date.now());
   const hasPromptedInactivityRef = useRef<boolean>(false);
 
@@ -232,6 +231,23 @@ export const ChatBox: React.FC = () => {
 
   const adaptiveKeyboard = getAdaptiveSymbols(selectedGrade || 5, activeSubject, examType);
 
+  // Ссылки на стабильные коллбэки для исключения перезапусков сокета
+  const callbacksRef = useRef({
+    appendStreamingToken,
+    setIsStreaming,
+    speakText,
+    resetActivityTimer,
+  });
+
+  useEffect(() => {
+    callbacksRef.current = {
+      appendStreamingToken,
+      setIsStreaming,
+      speakText,
+      resetActivityTimer,
+    };
+  });
+
   const processImageFile = useCallback((file: File | Blob, customLabel: string = 'Скриншот / Фото (Vision OCR)') => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -264,17 +280,17 @@ export const ChatBox: React.FC = () => {
     return () => window.removeEventListener('paste', handleGlobalPaste);
   }, [processImageFile]);
 
+  // ПОСТОЯННОЕ И СТАБИЛЬНОЕ ПОДКЛЮЧЕНИЕ WEBSOCKET БЕЗ ПЕРЕЗАПУСКОВ
   useEffect(() => {
     const ws = new ChatWebSocketClient(
       'session-demo-123',
-      (token) => appendStreamingToken(token),
+      (token) => callbacksRef.current.appendStreamingToken(token),
       () => {
-        setIsStreaming(false);
-        resetActivityTimer();
+        callbacksRef.current.setIsStreaming(false);
+        callbacksRef.current.resetActivityTimer();
 
         const lastMsg = useChatStore.getState().messages.slice(-1)[0];
         if (lastMsg && lastMsg.sender === 'assistant' && lastMsg.text) {
-          // ОБНОВЛЯЕМ КАРТОЧКУ ТОЛЬКО ЕСЛИ БЫЛ ОТПРАВЛЕН СКРИНШОТ/ФОТО!
           if (sentWithImageRef.current) {
             const ocrText = extractOcrTaskText(lastMsg.text);
             if (ocrText) {
@@ -282,16 +298,24 @@ export const ChatBox: React.FC = () => {
             }
             sentWithImageRef.current = false;
           }
-
-          speakText(lastMsg.text);
+          callbacksRef.current.speakText(lastMsg.text);
         }
+      },
+      (err) => {
+        console.warn('Chat WS Error:', err);
+      },
+      (status) => {
+        setConnectionStatus(status);
       }
     );
+
     ws.connect();
     wsClientRef.current = ws;
 
-    return () => ws.disconnect();
-  }, [speakText, appendStreamingToken, setIsStreaming, resetActivityTimer]);
+    return () => {
+      ws.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -367,10 +391,8 @@ export const ChatBox: React.FC = () => {
     const textToSend = overrideText || input;
     if ((!textToSend.trim() && !selectedImage) || isStreaming) return;
 
-    // Фиксируем, было ли прикреплено изображение
     sentWithImageRef.current = Boolean(selectedImage);
 
-    // ТОЧНЫЙ ДЕТЕКТОР НОВОГО ЗАДАНИЯ
     const lowerInput = textToSend.toLowerCase().trim();
 
     const hasTaskDirective =
@@ -485,13 +507,13 @@ export const ChatBox: React.FC = () => {
         </div>
       )}
 
-      {/* ШАПКА ЧАТА */}
+      {/* ШАПКА ЧАТА С ИНДИКАТОРОМ СЕТИ */}
       <div className="sticky top-0 z-20 shrink-0 p-3 bg-white/95 border-b border-slate-200/80 flex flex-wrap justify-between items-center gap-2 shadow-xs backdrop-blur-md">
         <div className="flex items-center gap-3">
           <TutorMascot state={getMascotState()} onClick={() => setIsWardrobeOpen(true)} />
 
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xs font-bold text-slate-900">{currentCompetencyTitle}</h2>
               <button
                 onClick={() => setIsWardrobeOpen(true)}
@@ -516,6 +538,40 @@ export const ChatBox: React.FC = () => {
               >
                 {isVoiceEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
                 <span className="text-[9px] font-bold">{isVoiceEnabled ? 'Голос' : 'Без звука'}</span>
+              </button>
+
+              {/* ИНДИКАТОР СТАТУСА СЕРВЕРА */}
+              <button
+                onClick={() => wsClientRef.current?.connect()}
+                title={
+                  connectionStatus === 'connected'
+                    ? 'Сервер в сети (соединение стабильно)'
+                    : 'Нажмите для повторного подключения'
+                }
+                className={`text-[9px] font-bold px-2 py-0.5 rounded-full border transition flex items-center gap-1 ${
+                  connectionStatus === 'connected'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : connectionStatus === 'connecting'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
+                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 cursor-pointer'
+                }`}
+              >
+                {connectionStatus === 'connected' ? (
+                  <>
+                    <Wifi size={10} className="text-emerald-600" />
+                    <span>Онлайн</span>
+                  </>
+                ) : connectionStatus === 'connecting' ? (
+                  <>
+                    <Loader2 size={10} className="animate-spin text-amber-600" />
+                    <span>Связь...</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff size={10} className="text-rose-600" />
+                    <span>Переподключить</span>
+                  </>
+                )}
               </button>
             </div>
             <p className="text-[10px] text-slate-500 mt-0.5">Уровень знания: {Math.round(pMastery * 100)}%</p>

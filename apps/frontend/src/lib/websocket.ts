@@ -1,9 +1,12 @@
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
+
 export class ChatWebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
   private onTokenCallback: (token: string) => void;
   private onEndCallback: () => void;
   private onErrorCallback?: (err: any) => void;
+  private onStatusChange?: (status: ConnectionStatus) => void;
 
   private isManuallyClosed: boolean = false;
   private reconnectAttempts: number = 0;
@@ -15,41 +18,55 @@ export class ChatWebSocketClient {
     sessionId: string,
     onToken: (token: string) => void,
     onEnd: () => void,
-    onError?: (err: any) => void
+    onError?: (err: any) => void,
+    onStatusChange?: (status: ConnectionStatus) => void
   ) {
-    // 1. Умная нормализация адреса сокетов для любых телефонов
-    let wsBase = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'ws://localhost:8000';
-    
-    // Авто-конвертация http -> ws и https -> wss
+    let wsBase =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      '';
+
+    if (!wsBase && typeof window !== 'undefined') {
+      const isHttps = window.location.protocol === 'https:';
+      const host = window.location.host;
+      wsBase = `${isHttps ? 'wss' : 'ws'}://${host}`;
+    }
+
     if (wsBase.startsWith('https://')) {
       wsBase = wsBase.replace('https://', 'wss://');
     } else if (wsBase.startsWith('http://')) {
       wsBase = wsBase.replace('http://', 'ws://');
     }
 
-    // Удаляем лишние слэши на конце
     wsBase = wsBase.replace(/\/+$/, '');
 
     this.url = `${wsBase}/api/v1/chat/ws/${sessionId}`;
     this.onTokenCallback = onToken;
     this.onEndCallback = onEnd;
     this.onErrorCallback = onError;
+    this.onStatusChange = onStatusChange;
   }
 
   public connect(): void {
     this.isManuallyClosed = false;
 
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
 
     this.cleanup();
+    this.onStatusChange?.('connecting');
 
     try {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
+        this.onStatusChange?.('connected');
         this.startHeartbeat();
         this.flushQueue();
       };
@@ -70,16 +87,19 @@ export class ChatWebSocketClient {
       };
 
       this.ws.onerror = (err) => {
+        this.onStatusChange?.('disconnected');
         if (this.onErrorCallback) this.onErrorCallback(err);
       };
 
       this.ws.onclose = () => {
         this.stopHeartbeat();
+        this.onStatusChange?.('disconnected');
         if (!this.isManuallyClosed) {
           this.scheduleReconnect();
         }
       };
     } catch (err) {
+      this.onStatusChange?.('disconnected');
       this.scheduleReconnect();
     }
   }

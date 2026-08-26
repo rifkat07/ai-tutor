@@ -7,7 +7,7 @@ from app.core.config import settings
 
 
 class LLMService:
-    """Сервис живого ИИ-диалога на Cerebras LPU с обходом блокировок Cloudflare WAF 403."""
+    """Сервис живого ИИ-диалога строго на модели Gemma 4 31B (Cerebras LPU)."""
 
     BROWSER_HEADERS = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -15,68 +15,45 @@ class LLMService:
         "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
         "Origin": "https://cerebras.ai",
         "Referer": "https://cerebras.ai/",
-        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "cross-site",
     }
 
     def _get_active_credentials(self) -> Tuple[str, List[str], Dict[str, str]]:
         raw_key = (
             getattr(settings, "CEREBRAS_API_KEY", None)
-            or getattr(settings, "GROQ_API_KEY", None)
             or getattr(settings, "DEEPSEEK_API_KEY", None)
+            or getattr(settings, "GROQ_API_KEY", None)
             or "csk-8xf9fk25menphrn6e4twexxt5px62v8kkmhkpmn4n3rytjp4"
         ).strip()
 
         base_url_setting = (
             getattr(settings, "CEREBRAS_BASE_URL", None)
-            or getattr(settings, "GROQ_BASE_URL", None)
             or getattr(settings, "DEEPSEEK_BASE_URL", None)
+            or getattr(settings, "GROQ_BASE_URL", None)
             or "https://api.cerebras.ai/v1"
         ).strip().rstrip("/")
 
         user_configured_model = (
             getattr(settings, "CEREBRAS_MODEL", None)
-            or getattr(settings, "GROQ_CHAT_MODEL", None)
             or getattr(settings, "DEEPSEEK_CHAT_MODEL", None)
+            or "gemma-4-31b"
         )
 
         if raw_key.startswith("csk-"):
             endpoint = "https://api.cerebras.ai/v1/chat/completions"
-            candidate_models = [
-                user_configured_model or "llama-3.3-70b",
-                "llama-3.3-70b",
-                "llama3.1-8b",
-                "llama-3.1-70b",
-            ]
+            candidate_models = [user_configured_model, "gemma-4-31b"]
         elif raw_key.startswith("gsk_"):
             endpoint = "https://api.groq.com/openai/v1/chat/completions"
-            candidate_models = [
-                user_configured_model or "llama-3.3-70b-versatile",
-                "llama-3.3-70b-versatile",
-                "gemma2-9b-it",
-            ]
+            candidate_models = [user_configured_model, "gemma-4-31b", "gemma2-9b-it"]
         elif raw_key.startswith("sk-or-"):
             endpoint = "https://openrouter.ai/api/v1/chat/completions"
-            candidate_models = [
-                user_configured_model or "meta-llama/llama-3.3-70b-instruct",
-                "meta-llama/llama-3.3-70b-instruct",
-                "google/gemma-2-9b-it",
-            ]
+            candidate_models = [user_configured_model, "google/gemma-4-31b", "google/gemma-2-27b-it"]
         else:
             endpoint = (
                 f"{base_url_setting}/chat/completions"
                 if not base_url_setting.endswith("/chat/completions")
                 else base_url_setting
             )
-            candidate_models = [
-                user_configured_model or "llama-3.3-70b",
-                "llama-3.3-70b",
-                "llama3.1-8b",
-            ]
+            candidate_models = [user_configured_model, "gemma-4-31b"]
 
         unique_models = []
         for m in candidate_models:
@@ -100,18 +77,10 @@ class LLMService:
             text,
             flags=re.IGNORECASE,
         )
-        cleaned = re.sub(
-            r"Response Safety:\s*\w+", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(
-            r"User Safety:\s*\w+", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(
-            r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE
-        )
-        cleaned = re.sub(
-            r"^[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE
-        )
+        cleaned = re.sub(r"Response Safety:\s*\w+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"User Safety:\s*\w+", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"^[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r"<think>[\s\S]*$", "", cleaned, flags=re.IGNORECASE)
         return cleaned.strip()
 
@@ -135,21 +104,15 @@ class LLMService:
                     timeout=httpx.Timeout(45.0, connect=10.0),
                     follow_redirects=True,
                 ) as client:
-                    res = await client.post(
-                        endpoint, headers=headers, json=payload
-                    )
+                    res = await client.post(endpoint, headers=headers, json=payload)
                     if res.status_code == 200:
                         data = res.json()
                         raw_text = data["choices"][0]["message"]["content"]
                         return self._clean_text_output(raw_text)
                     else:
-                        print(
-                            f"⚠️ LLM POST Error [{res.status_code}] for {model}: {res.text[:200]}"
-                        )
+                        print(f"⚠️ Gemma 4 POST Error [{res.status_code}] for {model}: {res.text[:200]}")
             except Exception as e:
-                print(
-                    f"⚠️ LLM Connection Exception for {model}: {type(e).__name__}: {e}"
-                )
+                print(f"⚠️ Gemma 4 Exception for {model}: {type(e).__name__}: {e}")
                 continue
 
         return ""
@@ -178,14 +141,10 @@ class LLMService:
                     timeout=httpx.Timeout(45.0, connect=10.0),
                     follow_redirects=True,
                 ) as client:
-                    async with client.stream(
-                        "POST", endpoint, headers=headers, json=payload
-                    ) as response:
+                    async with client.stream("POST", endpoint, headers=headers, json=payload) as response:
                         if response.status_code != 200:
                             err_body = await response.aread()
-                            print(
-                                f"⚠️ Stream Error [{response.status_code}] for {model}: {err_body.decode('utf-8', errors='ignore')[:200]}"
-                            )
+                            print(f"⚠️ Gemma 4 Stream Error [{response.status_code}] for {model}: {err_body.decode('utf-8', errors='ignore')[:200]}")
                             continue
 
                         in_think_block = False
@@ -200,38 +159,27 @@ class LLMService:
                                     text_chunk = delta.get("content")
 
                                     if text_chunk:
-                                        if (
-                                            "User Safety:" in text_chunk
-                                            or "Response Safety:" in text_chunk
-                                        ):
+                                        if "User Safety:" in text_chunk or "Response Safety:" in text_chunk:
                                             continue
                                         if "<think>" in text_chunk:
                                             in_think_block = True
                                             continue
                                         if "</think>" in text_chunk:
                                             in_think_block = False
-                                            text_chunk = text_chunk.split(
-                                                "</think>"
-                                            )[-1]
+                                            text_chunk = text_chunk.split("</think>")[-1]
 
                                         if not in_think_block and text_chunk:
                                             has_streamed_tokens = True
                                             yield text_chunk
 
-                                except (
-                                    json.JSONDecodeError,
-                                    KeyError,
-                                    IndexError,
-                                ):
+                                except (json.JSONDecodeError, KeyError, IndexError):
                                     continue
 
                         if has_streamed_tokens:
                             return
 
             except Exception as e:
-                print(
-                    f"⚠️ Stream error for {model}: {type(e).__name__}: {e}"
-                )
+                print(f"⚠️ Gemma 4 Stream error for {model}: {type(e).__name__}: {e}")
                 if has_streamed_tokens:
                     return
                 continue

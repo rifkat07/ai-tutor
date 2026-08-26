@@ -17,7 +17,19 @@ export class ChatWebSocketClient {
     onEnd: () => void,
     onError?: (err: any) => void
   ) {
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
+    // 1. Умная нормализация адреса сокетов для любых телефонов
+    let wsBase = process.env.NEXT_PUBLIC_WS_URL || process.env.NEXT_PUBLIC_API_URL || 'ws://localhost:8000';
+    
+    // Авто-конвертация http -> ws и https -> wss
+    if (wsBase.startsWith('https://')) {
+      wsBase = wsBase.replace('https://', 'wss://');
+    } else if (wsBase.startsWith('http://')) {
+      wsBase = wsBase.replace('http://', 'ws://');
+    }
+
+    // Удаляем лишние слэши на конце
+    wsBase = wsBase.replace(/\/+$/, '');
+
     this.url = `${wsBase}/api/v1/chat/ws/${sessionId}`;
     this.onTokenCallback = onToken;
     this.onEndCallback = onEnd;
@@ -27,7 +39,6 @@ export class ChatWebSocketClient {
   public connect(): void {
     this.isManuallyClosed = false;
 
-    // Если соединение уже открыто — ничего не делаем
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
@@ -62,7 +73,7 @@ export class ChatWebSocketClient {
         if (this.onErrorCallback) this.onErrorCallback(err);
       };
 
-      this.ws.onclose = (event) => {
+      this.ws.onclose = () => {
         this.stopHeartbeat();
         if (!this.isManuallyClosed) {
           this.scheduleReconnect();
@@ -73,7 +84,6 @@ export class ChatWebSocketClient {
     }
   }
 
-  // 1. ПУЛЬС-МОНИТОРИНГ (КАЖДЫЕ 15 СЕКУНД)
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.heartbeatTimer = setInterval(() => {
@@ -94,11 +104,10 @@ export class ChatWebSocketClient {
     }
   }
 
-  // 2. ЭКСПОНЕНЦИАЛЬНЫЙ АВТО-РЕКОННЕКТ
   private scheduleReconnect(): void {
     if (this.isManuallyClosed || this.reconnectTimer) return;
 
-    const delay = Math.min(5000, 500 * Math.pow(1.4, this.reconnectAttempts));
+    const delay = Math.min(4000, 500 * Math.pow(1.3, this.reconnectAttempts));
     this.reconnectAttempts++;
 
     this.reconnectTimer = setTimeout(() => {
@@ -107,7 +116,6 @@ export class ChatWebSocketClient {
     }, delay);
   }
 
-  // 3. ОТПРАВКА С ОЧЕРЕДЬЮ (ЕСЛИ СЕТЬ ВРЕМЕННО РАЗОРВАНА)
   public sendMessage(payload: object): void {
     const msgStr = JSON.stringify(payload);
 

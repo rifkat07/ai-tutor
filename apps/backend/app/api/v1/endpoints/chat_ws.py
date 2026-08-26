@@ -36,7 +36,12 @@ async def socratic_chat_ws(websocket: WebSocket, session_id: str):
                 )
                 continue
 
-            # ИЗВЛЕКАЕМ ДАННЫЕ БЕЗ ЗАХАРДКОЖЕННЫХ ДЕФОЛТОВ С ТРИГОНОМЕТРИЕЙ
+            # 1. ОБРАБОТКА ПУЛЬСА (PING / PONG) — МГНОВЕННЫЙ ОТВЕТ
+            if payload.get("type") == "ping":
+                await safe_send_json(websocket, {"type": "pong"})
+                continue
+
+            # 2. ИЗВЛЕКАЕМ ДАННЫЕ УРОКА
             student_text = payload.get("message") or ""
             hint_type = payload.get("hint_type", None)
             subject = payload.get("subject") or "Математика"
@@ -55,7 +60,7 @@ async def socratic_chat_ws(websocket: WebSocket, session_id: str):
                         websocket,
                         {
                             "type": "token",
-                            "content": "🔍 *Сканирую решение с фото тетради...*\n\n",
+                            "content": "🔍 *Сканирую решение с фото/скриншота...*\n\n",
                         },
                     )
                     ocr_analysis = await vision_service.analyze_notebook_photo(
